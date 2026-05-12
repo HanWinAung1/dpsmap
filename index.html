@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ဂျီယိုမြန်မာ — မြေပုံနှင့် GIS ဝန်ဆောင်မှုများ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --gold: #C9952A;
+    --gold-light: #E8B84B;
+    --dark: #0F0E0A;
+    --dark-2: #1A1916;
+    --dark-3: #252420;
+    --mid: #3D3B35;
+    --text: #EDE8DC;
+    --text-muted: #9A9485;
+    --red: #C03A2A;
+    --green: #2A7A4F;
+    --border: rgba(201,149,42,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--dark); color: var(--text);
+    font-family: 'Noto Sans Myanmar', sans-serif;
+    font-weight: 400; overflow-x: hidden; line-height: 1.8;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    background: rgba(15,14,10,0.93); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2.5rem; height: 64px;
+  }
+  .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .nav-logo-icon {
+    width: 36px; height: 36px; background: var(--gold);
+    clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .nav-logo span { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+  .nav-logo span em { color: var(--gold); font-style: normal; }
+  .nav-links { display: flex; }
+  .nav-links a {
+    color: var(--text-muted); text-decoration: none; font-size: 0.82rem;
+    padding: 0 0.9rem; height: 64px; display: flex; align-items: center;
+    border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; white-space: nowrap;
+  }
+  .nav-links a:hover { color: var(--gold); border-bottom-color: var(--gold); }
+  .nav-cta {
+    background: var(--gold) !important; color: var(--dark) !important;
+    padding: 0.4rem 1rem !important; height: auto !important;
+    border-radius: 4px; font-weight: 700 !important; margin-left: 0.5rem;
+    border-bottom: none !important;
+  }
+  .nav-cta:hover { background: var(--gold-light) !important; }
+
+  /* HERO */
+  .hero { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; padding-top: 64px; }
+  .hero-left { display: flex; flex-direction: column; justify-content: center; padding: 5rem 3rem 5rem 4rem; }
+  .hero-eyebrow {
+    font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 0.8rem;
+  }
+  .hero-eyebrow::before { content: ''; width: 32px; height: 1px; background: var(--gold); }
+  .hero h1 { font-size: clamp(1.9rem,3.8vw,3rem); font-weight: 700; line-height: 1.45; margin-bottom: 1.8rem; }
+  .hero h1 .accent { color: var(--gold); }
+  .hero-desc { font-size: 0.93rem; line-height: 2; color: var(--text-muted); max-width: 480px; margin-bottom: 2.5rem; }
+  .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--gold); color: var(--dark); padding: 0.85rem 1.8rem; border-radius: 4px;
+    font-weight: 700; font-size: 0.88rem; text-decoration: none; border: none; cursor: pointer;
+    transition: background 0.2s, transform 0.15s; display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: 'Noto Sans Myanmar', sans-serif;
+  }
+  .btn-primary:hover { background: var(--gold-light); transform: translateY(-1px); }
+  .btn-outline {
+    background: transparent; color: var(--text); padding: 0.85rem 1.8rem; border-radius: 4px;
+    font-weight: 500; font-size: 0.88rem; text-decoration: none; border: 1px solid var(--border);
+    cursor: pointer; transition: border-color 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: 'Noto Sans Myanmar', sans-serif;
+  }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+  .hero-stats { margin-top: 3rem; display: flex; gap: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+  .stat-num { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--gold); display: block; }
+  .stat-label { font-size: 0.75rem; color: var(--text-muted); }
+
+  /* MAP */
+  .hero-right { position: relative; background: var(--dark-2); border-left: 1px solid var(--border); }
+  #main-map { width: 100%; height: 100%; min-height: 500px; }
+  .map-overlay-ui { position: absolute; top: 1.2rem; left: 1.2rem; z-index: 900; display: flex; flex-direction: column; gap: 0.6rem; }
+  .map-btn {
+    background: rgba(15,14,10,0.85); border: 1px solid var(--border); color: var(--text);
+    padding: 0.5rem 0.9rem; border-radius: 4px; font-size: 0.78rem; cursor: pointer;
+    display: flex; align-items: center; gap: 0.5rem; backdrop-filter: blur(6px);
+    transition: border-color 0.2s, color 0.2s; font-family: 'Noto Sans Myanmar', sans-serif;
+  }
+  .map-btn:hover, .map-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,149,42,0.1); }
+  .map-legend {
+    position: absolute; bottom: 1.2rem; right: 1.2rem; z-index: 900;
+    background: rgba(15,14,10,0.85); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.8rem 1rem; backdrop-filter: blur(6px); font-size: 0.78rem;
+  }
+  .map-legend h4 { font-size: 0.72rem; color: var(--gold); margin-bottom: 0.6rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; color: var(--text-muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* TICKER */
+  .ticker { background: var(--gold); color: var(--dark); padding: 0.55rem 0; overflow: hidden; }
+  .ticker-inner {
+    display: flex; gap: 3rem; white-space: nowrap;
+    animation: ticker 40s linear infinite; font-size: 0.8rem; font-weight: 700;
+  }
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* SECTION */
+  section { padding: 6rem 0; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 2.5rem; }
+  .section-label {
+    font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 0.8rem;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .section-title { font-size: clamp(1.5rem,2.8vw,2.2rem); font-weight: 700; line-height: 1.4; margin-bottom: 1rem; }
+  .section-sub { color: var(--text-muted); font-size: 0.9rem; line-height: 2; max-width: 560px; margin-bottom: 3rem; }
+
+  /* CITY GRID */
+  .map-directory { background: var(--dark-2); }
+  .city-grid {
+    display: grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
+    gap: 1px; background: var(--border); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin-top: 3rem;
+  }
+  .city-card {
+    background: var(--dark-2); padding: 1.8rem 1.5rem; cursor: pointer;
+    position: relative; overflow: hidden; text-decoration: none; color: inherit;
+    display: block; transition: background 0.2s;
+  }
+  .city-card::before {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: var(--gold); transform: scaleX(0); transition: transform 0.3s;
+  }
+  .city-card:hover { background: var(--dark-3); }
+  .city-card:hover::before { transform: scaleX(1); }
+  .city-card:hover .city-arrow { transform: translateX(4px); color: var(--gold); }
+  .city-icon { font-size: 1.8rem; margin-bottom: 0.8rem; display: block; }
+  .city-name { font-size: 1rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .city-region { font-size: 0.73rem; color: var(--text-muted); margin-bottom: 0.8rem; }
+  .city-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .city-tag {
+    background: rgba(201,149,42,0.12); border: 1px solid rgba(201,149,42,0.3);
+    color: var(--gold); font-size: 0.63rem; padding: 0.2rem 0.5rem; border-radius: 2px;
+  }
+  .city-arrow { position: absolute; top: 1.5rem; right: 1.5rem; color: var(--text-muted); font-size: 1rem; transition: transform 0.2s, color 0.2s; }
+
+  /* SERVICES */
+  .services { background: var(--dark); }
+  .services-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; margin-top: 3rem; }
+  .service-card {
+    background: var(--dark-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; transition: border-color 0.3s, transform 0.2s;
+  }
+  .service-card:hover { border-color: var(--gold); transform: translateY(-3px); }
+  .service-icon {
+    width: 52px; height: 52px; background: rgba(201,149,42,0.12);
+    border: 1px solid rgba(201,149,42,0.3); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 1.5rem;
+  }
+  .service-name { font-size: 0.98rem; font-weight: 700; margin-bottom: 0.7rem; }
+  .service-desc { font-size: 0.83rem; line-height: 2; color: var(--text-muted); }
+
+  /* EXPLORER */
+  .map-explorer { background: var(--dark-3); }
+  .map-explorer-grid {
+    display: grid; grid-template-columns: 280px 1fr; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin-top: 3rem; min-height: 500px;
+  }
+  .map-sidebar { background: var(--dark-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  .map-sidebar-header { padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; color: var(--gold); }
+  .map-search { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+  .map-search input {
+    width: 100%; background: var(--dark); border: 1px solid var(--border);
+    color: var(--text); padding: 0.6rem 0.9rem; border-radius: 4px;
+    font-family: 'Noto Sans Myanmar', sans-serif; font-size: 0.85rem; outline: none;
+  }
+  .map-search input:focus { border-color: var(--gold); }
+  .map-search input::placeholder { color: var(--text-muted); }
+  .location-list { flex: 1; overflow-y: auto; }
+  .location-item {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    cursor: pointer; display: flex; align-items: center; gap: 0.8rem; transition: background 0.15s;
+  }
+  .location-item:hover, .location-item.active { background: rgba(201,149,42,0.08); }
+  .location-item.active .loc-name { color: var(--gold); }
+  .loc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .loc-name { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.1rem; }
+  .loc-type { font-size: 0.72rem; color: var(--text-muted); }
+  #explorer-map { flex: 1; min-height: 400px; }
+
+  /* DOWNLOADS */
+  .download-section { background: var(--dark-2); }
+  .download-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-top: 3rem; }
+  .download-card {
+    background: var(--dark); border: 1px solid var(--border); border-radius: 6px;
+    padding: 1.5rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  }
+  .download-card:hover { border-color: var(--gold); background: var(--dark-3); }
+  .dl-flag { font-size: 2.5rem; margin-bottom: 0.8rem; display: block; }
+  .dl-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .dl-info { font-size: 0.73rem; color: var(--text-muted); margin-bottom: 1rem; }
+  .dl-btn {
+    background: rgba(201,149,42,0.15); border: 1px solid rgba(201,149,42,0.4);
+    color: var(--gold); padding: 0.4rem 0.9rem; border-radius: 3px; font-size: 0.75rem;
+    font-weight: 700; cursor: pointer; transition: background 0.2s; display: inline-block;
+    font-family: 'Noto Sans Myanmar', sans-serif;
+  }
+  .dl-btn:hover { background: var(--gold); color: var(--dark); }
+
+  /* ABOUT */
+  .about { background: var(--dark); }
+  .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; }
+  .about-img-stack { position: relative; height: 460px; }
+  .about-card-main {
+    position: absolute; inset: 0; background: var(--dark-3); border: 1px solid var(--border);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  }
+  .about-map-bg {
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 35% 60%,rgba(201,149,42,0.08) 0%,transparent 50%),
+      linear-gradient(135deg,var(--dark-3) 0%,var(--dark-2) 100%);
+    display: flex; align-items: center; justify-content: center; font-size: 8rem; opacity: 0.4;
+  }
+  .about-badge {
+    position: absolute; bottom: -1rem; right: -1rem;
+    background: var(--gold); color: var(--dark); padding: 1.2rem 1.5rem; border-radius: 6px; text-align: center;
+  }
+  .about-badge-num { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 900; display: block; line-height: 1; }
+  .about-badge-text { font-size: 0.72rem; font-weight: 700; }
+  .timeline { margin-top: 2rem; }
+  .timeline-item { display: flex; gap: 1.5rem; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border); }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-year { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; color: var(--gold); flex-shrink: 0; width: 60px; }
+  .timeline-text { font-size: 0.83rem; line-height: 2; color: var(--text-muted); }
+  .timeline-text strong { color: var(--text); }
+
+  /* CONTACT */
+  .contact { background: var(--dark-2); }
+  .contact-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 5rem; }
+  .contact-info p { font-size: 0.88rem; line-height: 2; color: var(--text-muted); margin-bottom: 2rem; }
+  .contact-detail { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-start; }
+  .contact-detail-icon { color: var(--gold); flex-shrink: 0; }
+  .contact-detail-text { font-size: 0.83rem; color: var(--text-muted); line-height: 1.8; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .form-group { margin-bottom: 1rem; }
+  .form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; background: var(--dark); border: 1px solid var(--border);
+    color: var(--text); padding: 0.8rem 1rem; border-radius: 4px;
+    font-family: 'Noto Sans Myanmar', sans-serif; font-size: 0.85rem; outline: none;
+    transition: border-color 0.2s; resize: vertical;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--gold); }
+  .form-group select { appearance: none; cursor: pointer; }
+  .form-group textarea { min-height: 100px; }
+
+  /* FOOTER */
+  footer { background: var(--dark); border-top: 1px solid var(--border); padding: 4rem 0 2rem; }
+  .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; margin-bottom: 3rem; }
+  .footer-brand-desc { font-size: 0.83rem; line-height: 2; color: var(--text-muted); margin-top: 1rem; max-width: 300px; }
+  .footer-col h4 { font-size: 0.78rem; font-weight: 700; color: var(--gold); margin-bottom: 1.2rem; }
+  .footer-col a { display: block; text-decoration: none; font-size: 0.83rem; color: var(--text-muted); margin-bottom: 0.7rem; transition: color 0.2s; }
+  .footer-col a:hover { color: var(--text); }
+  .footer-bottom { border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: var(--text-muted); }
+  .footer-bottom a { color: var(--gold); text-decoration: none; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--dark-2); border: 1px solid var(--border); border-radius: 10px; padding: 2.5rem; max-width: 480px; width: 90%; position: relative; }
+  .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; }
+  .modal h2 { font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: 700; }
+  .modal p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.8; }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+  .fade-up { animation: fadeUp 0.7s ease both; }
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--dark-2); }
+  ::-webkit-scrollbar-thumb { background: var(--mid); border-radius: 3px; }
+
+  .leaflet-container { background: #0F0E0A; }
+  .leaflet-control-zoom { border: 1px solid var(--border) !important; border-radius: 4px !important; }
+  .leaflet-control-zoom a { background: var(--dark-2) !important; color: var(--text) !important; border: none !important; }
+  .leaflet-control-zoom a:hover { background: var(--dark-3) !important; color: var(--gold) !important; }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { height: 340px; }
+    .services-grid { grid-template-columns: 1fr 1fr; }
+    .about-grid, .contact-grid { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: 1fr 1fr; }
+    .map-explorer-grid { grid-template-columns: 1fr; }
+    .map-sidebar { max-height: 250px; }
+    .download-grid { grid-template-columns: 1fr 1fr; }
+    .nav-links { display: none; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-icon">🗺</div>
+    <span>ဂျီယို<em>မြန်မာ</em></span>
+  </a>
+  <div class="nav-links">
+    <a href="#maps">မြေပုံများ</a>
+    <a href="#services">ဝန်ဆောင်မှုများ</a>
+    <a href="#explorer">မြေပုံရှာဖွေ</a>
+    <a href="#download">ဒေါင်းလုပ်</a>
+    <a href="#about">ကျွန်ုပ်တို့အကြောင်း</a>
+    <a href="#contact">ဆက်သွယ်ရန်</a>
+    <a href="#download" class="nav-cta">အခမဲ့မြေပုံ</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow fade-up">မြန်မာနိုင်ငံ၏ ဦးဆောင်သော မြေပုံအာဏာပိုင်</div>
+    <h1 class="fade-up delay-1">
+      <span class="accent">မြန်မာ</span>ကို<br>၁၉၉၅ ခုနှစ်မှ<br>မြေပုံဆွဲနေသည်
+    </h1>
+    <p class="hero-desc fade-up delay-2">
+      မြန်မာနိုင်ငံတစ်ဝန်းရှိ လုပ်ငန်းများ၊ အစိုးရဌာနများနှင့် ခရီးသွားများအတွက် ပြည့်စုံသော GIS ဒေတာ၊ မြို့ပြမြေပုံများနှင့် ပထဝီဆိုင်ရာ ဝန်ဆောင်မှုများ။ ရန်ကုန်မှ နေပြည်တော်အထိ — လမ်းတိုင်း၊ လိပ်စာတိုင်း။
+    </p>
+    <div class="hero-actions fade-up delay-3">
+      <a href="#explorer" class="btn-primary">▶ မြေပုံဖွင့်ကြည့်ရန်</a>
+      <a href="#download" class="btn-outline">↓ အခမဲ့ဒေါင်းလုပ်</a>
+    </div>
+    <div class="hero-stats fade-up delay-3">
+      <div class="stat-item">
+        <span class="stat-num">300K+</span>
+        <span class="stat-label">လိပ်စာများ</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">28</span>
+        <span class="stat-label">ပြည်နယ်နှင့် တိုင်းမြေပုံ</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">1998</span>
+        <span class="stat-label">ပထမဆုံး ဂြိုဟ်တုစစ်တမ်း</span>
+      </div>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div id="main-map"></div>
+    <div class="map-overlay-ui">
+      <button class="map-btn active" onclick="setLayer('streets',this)">🗺 လမ်းမြေပုံ</button>
+      <button class="map-btn" onclick="setLayer('satellite',this)">🛰 ဂြိုဟ်တုပုံ</button>
+      <button class="map-btn" onclick="setLayer('topo',this)">🏔 ကုန်းပြင်မြေပုံ</button>
+    </div>
+    <div class="map-legend">
+      <h4>ရည်ညွှန်းချက်</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#C9952A"></div> ကြီးမားသောမြို့</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#E8B84B"></div> မြို့နယ်</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2A7A4F"></div> သဘာဝနေရာ</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#C03A2A"></div> အမွေအနှစ်နေရာ</div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span>🗺 ရန်ကုန်မြို့မြေပုံ</span><span>·</span><span>🗺 မန္တလေးလမ်းညွှန်</span><span>·</span>
+    <span>🗺 နေပြည်တော်မြေပုံ</span><span>·</span><span>🗺 ပုဂံအမွေအနှစ်ဒေသ</span><span>·</span>
+    <span>🗺 အင်းလေးကန်ဒေသ</span><span>·</span><span>🗺 မြောက်ဦးရှေးဟောင်းမြို့</span><span>·</span>
+    <span>🗺 မော်လမြိုင်မြို့</span><span>·</span><span>🗺 မြန်မာလမ်းကွန်ယက် GIS</span><span>·</span>
+    <span>🗺 လူဦးရေသိပ်သည်းမှုမြေပုံ</span><span>·</span><span>🗺 စက်မှုဇုန်မြေပုံ</span><span>·</span>
+    <span>🗺 ရန်ကုန်မြို့မြေပုံ</span><span>·</span><span>🗺 မန္တလေးလမ်းညွှန်</span><span>·</span>
+    <span>🗺 နေပြည်တော်မြေပုံ</span><span>·</span><span>🗺 ပုဂံအမွေအနှစ်ဒေသ</span><span>·</span>
+    <span>🗺 အင်းလေးကန်ဒေသ</span><span>·</span><span>🗺 မြောက်ဦးရှေးဟောင်းမြို့</span><span>·</span>
+    <span>🗺 မော်လမြိုင်မြို့</span><span>·</span><span>🗺 မြန်မာလမ်းကွန်ယက် GIS</span><span>·</span>
+  </div>
+</div>
+
+<!-- MAP DIRECTORY -->
+<section class="map-directory" id="maps">
+  <div class="container">
+    <div class="section-label">မြေပုံစာရင်း</div>
+    <h2 class="section-title">မြန်မာနိုင်ငံ၏ မြို့များကို ရှာဖွေကြည့်ရှုပါ</h2>
+    <p class="section-sub">မြန်မာနိုင်ငံတစ်ဝန်းရှိ ကြီးမားသောမြို့နှင့် တိုင်းဒေသများအတွက် အသေးစိတ် လမ်းမြေပုံများ၊ POI ဒေတာများနှင့် GIS ဖိုင်များ ဒေါင်းလုပ်ရနိုင်သည်။</p>
+    <div class="city-grid">
+      <a class="city-card" href="#" onclick="flyTo(16.87,96.19,'ရန်ကုန်');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">🏙</span>
+        <div class="city-name">ရန်ကုန်</div>
+        <div class="city-region">ရန်ကုန်တိုင်းဒေသကြီး</div>
+        <div class="city-tags"><span class="city-tag">GIS</span><span class="city-tag">လမ်းမြေပုံ</span><span class="city-tag">စီးပွားရေး</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(21.97,96.08,'မန္တလေး');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">🏛</span>
+        <div class="city-name">မန္တလေး</div>
+        <div class="city-region">မန္တလေးတိုင်းဒေသကြီး</div>
+        <div class="city-tags"><span class="city-tag">အမွေအနှစ်</span><span class="city-tag">လမ်းမြေပုံ</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(19.74,96.12,'နေပြည်တော်');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">🏛</span>
+        <div class="city-name">နေပြည်တော်</div>
+        <div class="city-region">နေပြည်တော်တိုင်း</div>
+        <div class="city-tags"><span class="city-tag">မြို့တော်</span><span class="city-tag">GIS</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(21.17,94.86,'ပုဂံ');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">⛩</span>
+        <div class="city-name">ပုဂံ</div>
+        <div class="city-region">မန္တလေးတိုင်းဒေသကြီး</div>
+        <div class="city-tags"><span class="city-tag">အမွေအနှစ်</span><span class="city-tag">ခရီးသွား</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(20.59,96.91,'အင်းလေး');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">🏞</span>
+        <div class="city-name">အင်းလေးကန်</div>
+        <div class="city-region">ရှမ်းပြည်နယ်</div>
+        <div class="city-tags"><span class="city-tag">သဘာဝ</span><span class="city-tag">ခရီးသွား</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(16.49,97.62,'မော်လမြိုင်');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">⚓</span>
+        <div class="city-name">မော်လမြိုင်</div>
+        <div class="city-region">မွန်ပြည်နယ်</div>
+        <div class="city-tags"><span class="city-tag">ဆိပ်ကမ်း</span><span class="city-tag">ကိုလိုနီ</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(17.33,96.48,'ပဲခူး');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">🕌</span>
+        <div class="city-name">ပဲခူး</div>
+        <div class="city-region">ပဲခူးတိုင်းဒေသကြီး</div>
+        <div class="city-tags"><span class="city-tag">အမွေအနှစ်</span><span class="city-tag">ဘာသာ</span></div>
+      </a>
+      <a class="city-card" href="#" onclick="flyTo(20.08,93.20,'မြောက်ဦး');return false;">
+        <span class="city-arrow">→</span><span class="city-icon">🏚</span>
+        <div class="city-name">မြောက်ဦး</div>
+        <div class="city-region">ရခိုင်ပြည်နယ်</div>
+        <div class="city-tags"><span class="city-tag">ရှေးဟောင်း</span><span class="city-tag">အမွေအနှစ်</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="services" id="services">
+  <div class="container">
+    <div class="section-label">ကျွန်ုပ်တို့ ပေးသောဝန်ဆောင်မှုများ</div>
+    <h2 class="section-title">ကျွမ်းကျင်သော GIS ဝန်ဆောင်မှုများ</h2>
+    <p class="section-sub">ဂြိုဟ်တုပုံ ဒစ်ဂျစ်တိုက်ဇေးရှင်းမှ ယာဉ်တပ်တောင်းခြေရာခံမှုအထိ — လုပ်ငန်းများနှင့် အစိုးရအတွက် ပထဝီဆိုင်ရာ ဖြေရှင်းချက်များ ပေးနေသည်။</p>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">🛰</div>
+        <div class="service-name">GIS ဒေတာသိုလှောင်မှု</div>
+        <p class="service-desc">ရန်ကုန်၊ မန္တလေးနှင့် အဓိကမြို့ကြီးများ၏ ပြည့်စုံသော လမ်းကွန်ယက်၊ လိပ်စာ၊ POI၊ ကျောင်းများ၊ ဆေးခန်းများနှင့် အစိုးရရုံးများ ဒေတာများ — စဉ်ဆက်မပြတ် မွမ်းမံပေးသည်။</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">📡</div>
+        <div class="service-name">GPS ယာဉ်ခြေရာခံမှု</div>
+        <p class="service-desc">ကျွန်ုပ်တို့၏ ပိုင်ဆိုင်သော မြေပုံများကို အသုံးပြု၍ GPS ဖြင့် ယာဉ်တပ်တောင်းများကို အချိန်နှင့်တပြေးညီ စီမံခန့်ခွဲပေးသည်။ ကုန်တင်ယာဉ်နှင့် ဆိုင်ငှားယာဉ်များအတွက် အသင့်တော်ဆုံး။</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🖨</div>
+        <div class="service-name">မြေပုံပုံနှိပ်ထုတ်ဝေမှု</div>
+        <p class="service-desc">နံရံကပ်မြေပုံများ၊ ဗိုင်နိုင်ပုံနှိပ်မှုများနှင့် ချည်ထားသော လမ်းညွှန်များ အရည်အသွေးမြင့်မြင့် ထုတ်လုပ်ပေးသည်။ Custom ပုံနှိပ်မှု ဝန်ဆောင်မှု ရရှိနိုင်သည်။</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🏠</div>
+        <div class="service-name">၁ တောင်ဧရိယာ လိပ်စာမြေပုံ</div>
+        <p class="service-desc">Grab ကဲ့သို့သော ယာဉ်ငှားဝန်ဆောင်မှုများမှ အသုံးပြုသော လိပ်စာအမှတ် (AP) ဒေတာ။ ရန်ကုန်နှင့် မန္တလေးအတွက် AP ၃၀၀,၀၀၀ ကျော်ရှိသည်။</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🌐</div>
+        <div class="service-name">ဝဘ်ဆိုက်မြေပုံဝန်ဆောင်မှု</div>
+        <p class="service-desc">ကျွန်ုပ်တို့၏ GIS အခြေခံကို အသုံးပြု၍ ဝဘ်ဆိုက်တွင် Live မြေပုံ၊ စီးပွားရေးရှာဖွေ၊ လမ်းကြောင်း ပလပ်ဖောင်းများ တည်ဆောက်ပေးသည်။</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🌊</div>
+        <div class="service-name">ရေလွှမ်းမိုးမှု တုပ်ဆောင်မှုနှင့် ခွဲခြမ်းစိတ်ဖြာမှု</div>
+        <p class="service-desc">မြို့ပြစီမံကိန်း၊ သဘာဝဘေးအန္တရာယ်ကြိုတင်ပြင်ဆင်မှုနှင့် အခြေခံအဆောက်အဦ ရင်းနှီးမြှုပ်နှံမှုများအတွက် ရေကြောင်းပုံစံချမှုနှင့် ရေလွှမ်းမိုးမှုအန္တရာယ်မြေပုံဆွဲမှု။</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXPLORER -->
+<section class="map-explorer" id="explorer">
+  <div class="container">
+    <div class="section-label">မြေပုံရှာဖွေကြည့်ရှု</div>
+    <h2 class="section-title">မြန်မာနိုင်ငံကို တက်ကြွစွာ ကြည့်ရှုပါ</h2>
+    <p class="section-sub">မြို့ကြီး၊ မြို့နယ်နှင့် ကြယ်ပွင့်နေရာများကို မြေပုံပေါ် နှိပ်ကြည့်ရှုနိုင်သည်။ ရှာဖွေရာတွင် မြေပုံ အလိုအလျောက် ပျံဝဲသွားသည်။</p>
+    <div class="map-explorer-grid">
+      <div class="map-sidebar">
+        <div class="map-sidebar-header">📍 နေရာများ</div>
+        <div class="map-search">
+          <input type="text" id="loc-search" placeholder="နေရာရှာဖွေပါ..." oninput="filterLocations(this.value)">
+        </div>
+        <div class="location-list" id="location-list"></div>
+      </div>
+      <div id="explorer-map"></div>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOADS -->
+<section class="download-section" id="download">
+  <div class="container">
+    <div class="section-label">အခမဲ့မြေပုံ ဒေါင်းလုပ်</div>
+    <h2 class="section-title">တရားဝင်မြေပုံများ ဒေါင်းလုပ်ရယူပါ</h2>
+    <p class="section-sub">ဖောင်တိုတစ်ခု ဖြည့်ပေးကာ သင်၏ email တွင် ဒေါင်းလုပ်လင့်ခ် ရယူပါ။ HD PDF နှင့် ပုံနှိပ်ရန် ဖော်မတ်များ ရရှိနိုင်သည်။</p>
+    <div class="download-grid">
+      <div class="download-card" onclick="openDownload('မြန်မာနိုင်ငံမြေပုံ (အင်္ဂလိပ်)')">
+        <span class="dl-flag">🇲🇲</span>
+        <div class="dl-name">မြန်မာ (အင်္ဂလိပ်)</div>
+        <div class="dl-info">နိုင်ငံပြမြေပုံ · PDF · A0</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('မြန်မာနိုင်ငံမြေပုံ (မြန်မာ)')">
+        <span class="dl-flag">🇲🇲</span>
+        <div class="dl-name">မြန်မာ (မြန်မာဘာသာ)</div>
+        <div class="dl-info">နိုင်ငံပြမြေပုံ · PDF · A0</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('ရန်ကုန်မြို့မြေပုံ')">
+        <span class="dl-flag">🏙</span>
+        <div class="dl-name">ရန်ကုန်မြို့</div>
+        <div class="dl-info">မြို့နယ်အသေးစိတ် · PDF · A1</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('မန္တလေးမြို့မြေပုံ')">
+        <span class="dl-flag">🏛</span>
+        <div class="dl-name">မန္တလေးမြို့</div>
+        <div class="dl-info">လမ်းညွှန် · PDF · A1</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('နေပြည်တော်မြေပုံ')">
+        <span class="dl-flag">🏛</span>
+        <div class="dl-name">နေပြည်တော်</div>
+        <div class="dl-info">မြို့တော်ဒေသ · PDF · A1</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('ပုဂံမြေပုံ')">
+        <span class="dl-flag">⛩</span>
+        <div class="dl-name">ပုဂံအမွေအနှစ်</div>
+        <div class="dl-info">စေတီဘုရားမြေပုံ · PDF · A2</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('အင်းလေးကန်မြေပုံ')">
+        <span class="dl-flag">🏞</span>
+        <div class="dl-name">အင်းလေးကန်</div>
+        <div class="dl-info">ခရီးသွားမြေပုံ · PDF · A2</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+      <div class="download-card" onclick="openDownload('မော်လမြိုင်မြေပုံ')">
+        <span class="dl-flag">⚓</span>
+        <div class="dl-name">မော်လမြိုင်</div>
+        <div class="dl-info">မြို့မြေပုံ · PDF · A2</div>
+        <div class="dl-btn">↓ ဒေါင်းလုပ်</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-img-stack">
+        <div class="about-card-main">
+          <div class="about-map-bg">🗺</div>
+        </div>
+        <div class="about-badge">
+          <span class="about-badge-num">30</span>
+          <span class="about-badge-text">နှစ်သုံးဆယ် မြေပုံဆွဲမှု</span>
+        </div>
+      </div>
+      <div class="about-content">
+        <div class="section-label">ကျွန်ုပ်တို့၏ ဇာတ်ကြောင်း</div>
+        <h2 class="section-title">နှစ်ပေါင်းများစွာ၏ ကွင်းဆင်းသုတေသနနှင့် တည်ဆောက်ထားသည်</h2>
+        <p class="section-sub" style="margin-bottom:0">၁၉၉၈ ခုနှစ်တွင် ဒစ်ဂျစ်တိုက်ဇ် ပြုလုပ်ခဲ့သော ပထမဆုံးဂြိုဟ်တုပုံမှ ယနေ့ လိပ်စာ ၃၀၀,၀၀၀ ကျော် ဒေတာဘေ့စ်အထိ — ဂျီယိုမြန်မာသည် မြန်မာနိုင်ငံ၏ ပထဝီဒေတာ ကျောရိုးဖြစ်ခဲ့သည်။</p>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-year">1995</div>
+            <div class="timeline-text"><strong>ဒီဇိုင်းပုံနှိပ်ဝန်ဆောင်မှုများ (DPS) တည်ထောင်ခဲ့သည်။</strong> ရန်ကုန်မြို့လမ်းညွှန် — နိုင်ငံ၏ ပထမဆုံးကို ထုတ်ဝေခဲ့သည်။</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">1998</div>
+            <div class="timeline-text"><strong>ပထမဆုံး ဂြိုဟ်တုဒေတာ ရယူမှု။</strong> Trimble Pro XR GPS ဖြင့် ဂျီကုဒ်ထည့်ကာ — ထိုစဉ်က မြန်မာပြည်တွင် စစ်ရေးနှင့် ရေနံသာ အသုံးပြုနိုင်သော နည်းပညာကို ကျော်လွန်ခဲ့သည်။</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">2010+</div>
+            <div class="timeline-text"><strong>GIS ဒေတာဘေ့စ် တိုးချဲ့မှု။</strong> ရန်ကုန်ပြည့်စုံ GIS သိုလှောင်မှုတစ်ခု တည်ဆောက်ပြီး လမ်းများ၊ ကျောင်းများ၊ ဆေးခန်းများ၊ အစိုးရရုံးများ ပါဝင်ခဲ့သည်။</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">2020</div>
+            <div class="timeline-text"><strong>အိမ်ထောင်စုဆယ်ဦး မြေပုံ။</strong> ရန်ကုန်တိုင်းဒေသကြီးအစိုးရ၊ မြို့တော်ဝန်အဖွဲ့နှင့် ရန်ကုန်နည်းပညာတက္ကသိုလ်တို့နှင့် ပူးပေါင်း၍ ပြည်လုံးကျွတ် အိမ်ထောင်စု GIS ဒေတာဘေ့စ် ရေးဆွဲခဲ့သည်။</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact" id="contact">
+  <div class="container">
+    <div class="contact-grid">
+      <div class="contact-info">
+        <div class="section-label">ဆက်သွယ်ရန်</div>
+        <h2 class="section-title">မြေပုံ မှာယူရန် သို့မဟုတ် GIS ဒေတာ တောင်းဆိုရန်</h2>
+        <p>ပုံနှိပ်နံရံမြေပုံ၊ Custom GIS ဒေတာ သို့မဟုတ် ယာဉ်ခြေရာခံ ပေါင်းစပ်မှုတစ်ခု လိုအပ်ပါက ကျွန်ုပ်တို့၏ အဖွဲ့ကို ဆက်သွယ်ပါ။</p>
+        <div class="contact-detail">
+          <span class="contact-detail-icon">📍</span>
+          <span class="contact-detail-text">အခန်း ၃၀၇၊ ယဉ်ကျော်ဆောင်၊ ယဉ်ကျော်လမ်း၊ ပဇုန်ဒောင်းမြို့နယ်၊ ရန်ကုန်မြို့</span>
+        </div>
+        <div class="contact-detail">
+          <span class="contact-detail-icon">📞</span>
+          <span class="contact-detail-text">+95 (09) 774 204 020<br>+95 (09) 775 204 020</span>
+        </div>
+        <div class="contact-detail">
+          <span class="contact-detail-icon">✉</span>
+          <span class="contact-detail-text">info@geomyanmar.com</span>
+        </div>
+      </div>
+      <div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>နာမည် (ပထမ)</label>
+            <input type="text" placeholder="ကိုအောင်">
+          </div>
+          <div class="form-group">
+            <label>နာမည် (နောက်ဆုံး)</label>
+            <input type="text" placeholder="ကျော်">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>အီးမေးလ်</label>
+          <input type="email" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label>စုံစမ်းမေးမြန်းမှုအမျိုးအစား</label>
+          <select>
+            <option>မြေပုံဒေါင်းလုပ် / မှာယူ</option>
+            <option>GIS ဒေတာ တောင်းဆိုမှု</option>
+            <option>ယာဉ်ခြေရာခံမှု</option>
+            <option>Custom ပုံနှိပ်မှု</option>
+            <option>ဝဘ်ဆိုက် / API ဝန်ဆောင်မှု</option>
+            <option>အခြား</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>မက်ဆေ့ချ်</label>
+          <textarea placeholder="သင်၏ စီမံကိန်းအကြောင်း ပြောပြပါ..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="alert('ကျေးဇူးတင်ပါသည်! မကြာမီ ဆက်သွယ်ပေးပါမည်။')">မက်ဆေ့ချ်ပို့ရန် →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.5rem;">
+          <div style="width:32px;height:32px;background:var(--gold);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;">🗺</div>
+          <span style="font-size:1rem;font-weight:700;">ဂျီယို<span style="color:var(--gold)">မြန်မာ</span></span>
+        </div>
+        <p class="footer-brand-desc">၁၉၉၅ ခုနှစ်မှ မြန်မာနိုင်ငံ၏ ဦးဆောင်သော GIS နှင့် မြေပုံ ကုမ္ပဏီ။ အစိုးရ၊ စီးပွားရေးနှင့် ခရီးသွားများအတွက် ပထဝီဒေတာ ဖြေရှင်းချက်များ ပေးနေသည်။</p>
+      </div>
+      <div class="footer-col">
+        <h4>မြေပုံများ</h4>
+        <a href="#">ရန်ကုန်မြေပုံ</a>
+        <a href="#">မန္တလေးမြေပုံ</a>
+        <a href="#">နေပြည်တော်မြေပုံ</a>
+        <a href="#">ပုဂံမြေပုံ</a>
+        <a href="#">မြို့အားလုံး</a>
+      </div>
+      <div class="footer-col">
+        <h4>ဝန်ဆောင်မှုများ</h4>
+        <a href="#">GIS ဒေတာ</a>
+        <a href="#">GPS ခြေရာခံ</a>
+        <a href="#">မြေပုံပုံနှိပ်</a>
+        <a href="#">တောင်ဧရိယာမြေပုံ</a>
+        <a href="#">ရေလွှမ်းမိုး တုပ်ဆောင်</a>
+      </div>
+      <div class="footer-col">
+        <h4>ကုမ္ပဏီ</h4>
+        <a href="#">ကျွန်ုပ်တို့အကြောင်း</a>
+        <a href="#">အခမဲ့ဒေါင်းလုပ်</a>
+        <a href="#">ကိုယ်ရေးလုံခြုံမှု</a>
+        <a href="#">ဆက်သွယ်ရန်</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2025 ဂျီယိုမြန်မာ — ဒီဇိုင်းပုံနှိပ်ဝန်ဆောင်မှု ကုမ္ပဏီ။ မူပိုင်ခွင့်အားလုံး ထိန်းသိမ်းထားသည်။</span>
+      <span><a href="#">ကိုယ်ရေးလုံခြုံမှုမူဝါဒ</a></span>
+    </div>
+  </div>
+</footer>
+
+<!-- DOWNLOAD MODAL -->
+<div class="modal-overlay" id="download-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeDownload()">✕</button>
+    <h2><span id="modal-map-name" style="color:var(--gold)"></span> ဒေါင်းလုပ်</h2>
+    <p>သင်၏ အချက်အလက်ကို ထည့်သွင်းပေးပါ၊ ဒေါင်းလုပ်လင့်ခ်ကို email ဖြင့် ပေးပို့ပါမည်။</p>
+    <div class="form-group">
+      <label>အမည်</label>
+      <input type="text" placeholder="သင်၏ အမည်">
+    </div>
+    <div class="form-group">
+      <label>အီးမေးလ်လိပ်စာ</label>
+      <input type="email" placeholder="your@email.com">
+    </div>
+    <div class="form-group">
+      <label>ရည်ရွယ်ချက်</label>
+      <select>
+        <option>ကိုယ်ရေး / ခရီးသွား</option>
+        <option>စီးပွားရေး</option>
+        <option>သုတေသန</option>
+        <option>အစိုးရ</option>
+      </select>
+    </div>
+    <button class="btn-primary" style="width:100%;justify-content:center;margin-top:0.5rem"
+      onclick="alert('ဒေါင်းလုပ်လင့်ခ် ပို့ပြီးပါပြီ! သင်၏ email ကို စစ်ဆေးပါ။'); closeDownload()">
+      ဒေါင်းလုပ်လင့်ခ် တောင်းဆိုရန် →
+    </button>
+  </div>
+</div>
+
+<script>
+const locations = [
+  { name: 'ရန်ကုန်', type: 'ကြီးမားသောမြို့', lat: 16.87, lng: 96.19, color: '#C9952A' },
+  { name: 'မန္တလေး', type: 'ကြီးမားသောမြို့', lat: 21.97, lng: 96.08, color: '#C9952A' },
+  { name: 'နေပြည်တော်', type: 'မြို့တော်', lat: 19.74, lng: 96.12, color: '#C9952A' },
+  { name: 'ပုဂံ', type: 'အမွေအနှစ်နေရာ', lat: 21.17, lng: 94.86, color: '#C03A2A' },
+  { name: 'အင်းလေးကန်', type: 'သဘာဝနေရာ', lat: 20.59, lng: 96.91, color: '#2A7A4F' },
+  { name: 'မော်လမြိုင်', type: 'ဆိပ်ကမ်းမြို့', lat: 16.49, lng: 97.62, color: '#E8B84B' },
+  { name: 'ပဲခူး', type: 'အမွေအနှစ်မြို့', lat: 17.33, lng: 96.48, color: '#C03A2A' },
+  { name: 'မြောက်ဦး', type: 'ရှေးဟောင်းမြို့', lat: 20.08, lng: 93.20, color: '#C03A2A' },
+  { name: 'တောင်ကြီး', type: 'တိုင်းမြို့တော်', lat: 20.79, lng: 97.03, color: '#E8B84B' },
+  { name: 'ကျိုက်ထီးရိုး', type: 'ဘာသာတရားနေရာ', lat: 17.48, lng: 97.10, color: '#C03A2A' },
+  { name: 'ပုသိမ်', type: 'မြို့', lat: 16.78, lng: 94.73, color: '#E8B84B' },
+  { name: 'ပြည်', type: 'သမိုင်းဝင်မြို့', lat: 18.82, lng: 95.22, color: '#E8B84B' },
+];
+
+let mainMap, explorerMap, markers = [], currentLayer;
+const tileLayers = {
+  streets: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  topo: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+};
+
+function initMainMap() {
+  mainMap = L.map('main-map', { zoomControl: false }).setView([19.5, 96.0], 5);
+  currentLayer = L.tileLayer(tileLayers.streets, { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(mainMap);
+  L.control.zoom({ position: 'bottomright' }).addTo(mainMap);
+  locations.forEach(loc => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:12px;height:12px;border-radius:50%;background:${loc.color};border:2px solid rgba(255,255,255,0.5);box-shadow:0 0 6px ${loc.color}88"></div>`,
+      iconSize: [12,12], iconAnchor: [6,6]
+    });
+    L.marker([loc.lat, loc.lng], { icon })
+      .bindPopup(`<b style="color:#C9952A">${loc.name}</b><br><small style="color:#9A9485">${loc.type}</small>`)
+      .addTo(mainMap);
+  });
+}
+
+function setLayer(type, btn) {
+  if (currentLayer) mainMap.removeLayer(currentLayer);
+  currentLayer = L.tileLayer(tileLayers[type], { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(mainMap);
+  document.querySelectorAll('.map-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function flyTo(lat, lng) {
+  mainMap.flyTo([lat, lng], 10, { duration: 1.5 });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function initExplorerMap() {
+  explorerMap = L.map('explorer-map').setView([19.5, 96.0], 5);
+  L.tileLayer(tileLayers.streets, { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(explorerMap);
+  locations.forEach((loc, i) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:${loc.color};border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 8px ${loc.color}aa"></div>`,
+      iconSize: [14,14], iconAnchor: [7,7]
+    });
+    const m = L.marker([loc.lat, loc.lng], { icon })
+      .bindPopup(`<b style="color:#C9952A">${loc.name}</b><br><small>${loc.type}</small>`)
+      .addTo(explorerMap);
+    markers.push(m);
+  });
+  buildLocationList(locations);
+}
+
+function buildLocationList(locs) {
+  const list = document.getElementById('location-list');
+  list.innerHTML = '';
+  locs.forEach(loc => {
+    const i = locations.indexOf(loc);
+    const item = document.createElement('div');
+    item.className = 'location-item';
+    item.innerHTML = `<div class="loc-dot" style="background:${loc.color}"></div><div class="loc-info"><div class="loc-name">${loc.name}</div><div class="loc-type">${loc.type}</div></div>`;
+    item.onclick = () => {
+      document.querySelectorAll('.location-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      explorerMap.flyTo([loc.lat, loc.lng], 9, { duration: 1 });
+      if (markers[i]) markers[i].openPopup();
+    };
+    list.appendChild(item);
+  });
+}
+
+function filterLocations(q) {
+  buildLocationList(locations.filter(l => l.name.includes(q) || l.type.includes(q)));
+}
+
+function openDownload(name) {
+  document.getElementById('modal-map-name').textContent = name;
+  document.getElementById('download-modal').classList.add('open');
+}
+function closeDownload() {
+  document.getElementById('download-modal').classList.remove('open');
+}
+document.getElementById('download-modal').onclick = e => { if (e.target.id === 'download-modal') closeDownload(); };
+
+window.addEventListener('load', () => {
+  initMainMap();
+  const obs = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) { initExplorerMap(); obs.disconnect(); }
+  }, { threshold: 0.1 });
+  obs.observe(document.getElementById('explorer'));
+});
+</script>
+</body>
+</html>
